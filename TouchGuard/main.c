@@ -10,6 +10,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
+#include <unistd.h>
 
 #define MAJOR_VERSION  1
 #define MINOR_VERSION  4
@@ -147,6 +148,11 @@ CGEventRef eventCallBack(CGEventTapProxy proxy, CGEventType type, CGEventRef eve
 
 int main(int argc, const char * argv[])
 {
+    // Line-buffer stdout so log lines flush immediately. Under the LaunchAgent
+    // stdout is a file, which is block-buffered by default - that would hide
+    // all output until ~4KB accumulates, making a working agent look dead.
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     CFMachPortRef eventTap;
     CFRunLoopSourceRef eventRunLoop;
     int count = 1;
@@ -195,6 +201,28 @@ int main(int argc, const char * argv[])
     }
     
     
+    // macOS 10.14+ requires Accessibility (TCC) trust to create an active
+    // event tap. A process launched by launchd (e.g. a LaunchAgent at login)
+    // does not inherit a terminal's trust, so request it and wait for the user
+    // to grant it rather than silently failing with exit(1) (the reason
+    // autostart never worked on modern macOS).
+    if(!AXIsProcessTrusted())
+    {
+        const void *keys[]   = { kAXTrustedCheckOptionPrompt };
+        const void *values[] = { kCFBooleanTrue };
+        CFDictionaryRef options = CFDictionaryCreate(NULL, keys, values, 1,
+            &kCFCopyStringDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        AXIsProcessTrustedWithOptions(options);
+        CFRelease(options);
+        fprintf(stderr, "TouchGuard: Accessibility permission required. Enable "
+            "TouchGuard under System Settings > Privacy & Security > Accessibility.\n");
+        while(!AXIsProcessTrusted())
+        {
+            sleep(2);
+        }
+        fprintf(stderr, "TouchGuard: Accessibility granted; starting.\n");
+    }
+
     eventTap = CGEventTapCreate(kCGHIDEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, kCGEventMaskForAllEvents, eventCallBack, NULL);
     
     if(!eventTap)

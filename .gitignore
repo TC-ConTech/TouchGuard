@@ -1,0 +1,8 @@
+# Build artifacts (compiled binary, diagnostics, debug symbols)
+build/
+*.dSYM/
+
+# macOS / Xcode cruft
+.DS_Store
+xcuserdata/
+*.xcuserstate
