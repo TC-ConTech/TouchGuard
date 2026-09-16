@@ -72,12 +72,28 @@ else
     exit 1
 fi
 
-# 2) Install + ad-hoc sign with a stable identifier so the Accessibility grant
-#    stays attached to the binary across reboots and rebuilds.
+# 2) Install + sign. Prefer a stable self-signed code-signing identity so the
+#    Accessibility grant survives reboots. On modern macOS (Sequoia+), an
+#    ad-hoc/cdhash-only signature gives TCC no stable identity to trust, so the
+#    Accessibility approval is dropped on every reboot. A named self-signed cert
+#    yields a cert-bound designated requirement that persists across reboots and
+#    rebuilds. Create the identity once (see README: "Signing identity setup"),
+#    then this installer reuses it. Falls back to ad-hoc with a loud warning.
+#    NOTE: with --system the codesign runs under sudo (root keychain) and will
+#    not see a user-login-keychain identity; user install (default) is fine.
+SIGN_ID="TouchGuard Self-Signed"
 $SUDO mkdir -p "$BIN_DIR"
 $SUDO cp "$SRC" "$BIN"
 $SUDO chmod +x "$BIN"
-$SUDO codesign --force --sign - --identifier "$LABEL" "$BIN" >/dev/null 2>&1 || true
+if security find-certificate -c "$SIGN_ID" >/dev/null 2>&1 \
+   && $SUDO codesign --force --sign "$SIGN_ID" --identifier "$LABEL" --timestamp=none "$BIN" >/dev/null 2>&1; then
+    echo "Signed with stable identity: $SIGN_ID"
+else
+    echo "WARN: identity '$SIGN_ID' unavailable; using ad-hoc sign." >&2
+    echo "      Accessibility approval will NOT survive reboots this way." >&2
+    echo "      Set up the signing identity (README) and re-run to fix it." >&2
+    $SUDO codesign --force --sign - --identifier "$LABEL" "$BIN" >/dev/null 2>&1 || true
+fi
 [ "$SRC" = "/tmp/TouchGuard.$$" ] && rm -f "$SRC"
 echo "Installed binary."
 
