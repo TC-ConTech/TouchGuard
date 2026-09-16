@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TouchGuard LaunchAgent template.
+  install.sh fills in @@BINARY@@, @@TIME@@ and @@LOG@@.
+
+  It is a LaunchAgent (not a LaunchDaemon) on purpose: an active CGEventTap
+  needs a window-server (GUI) session, which only exists once a user logs in.
+  A boot LaunchDaemon has no such session and the tap fails - which is why
+  earlier autostart attempts never worked on modern macOS.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.syntaxsoft.touchguard</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@@BINARY@@</string>
+        <string>-time</string>
+        <string>@@TIME@@</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <key>StandardOutPath</key>
+    <string>@@LOG@@</string>
+    <key>StandardErrorPath</key>
+    <string>@@LOG@@</string>
+</dict>
+</plist>
